@@ -73,3 +73,64 @@ export const processDocument = async (
     throw error;
   }
 };
+
+export const reconcileData = async (
+  documents: DocumentResult[],
+  fields: FieldDefinition[],
+  referenceData: any[],
+  userInstructions: string
+): Promise<string> => {
+  if (!process.env.API_KEY) {
+    throw new Error("API Key is missing");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  // Prepare data for the context
+  const extractedData = documents
+    .filter(d => d.status === 'success')
+    .map(d => {
+      const row: any = { fileName: d.fileName };
+      fields.forEach(f => {
+        row[f.name] = d.data[f.key]?.value || null;
+      });
+      return row;
+    });
+
+  const prompt = `
+    You are an expert data analyst performing a 'Tick & Tie' audit procedure.
+    
+    You have two datasets available as JSON variables in your context.
+    
+    Dataset 1: Extracted Data (from source documents)
+    ${JSON.stringify(extractedData, null, 2)}
+    
+    Dataset 2: Reference Data (from user upload)
+    ${JSON.stringify(referenceData, null, 2)}
+
+    User Instructions:
+    "${userInstructions}"
+
+    Goal:
+    Write and execute Python code to perform the analysis requested by the user.
+    Load the data into pandas DataFrames (create the dataframes directly from the provided JSON data).
+    Perform the comparison/join/reconciliation.
+    Print the results in a clear, readable format (e.g., markdown table or summary text).
+    Explain any discrepancies found.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { text: prompt },
+      config: {
+        tools: [{ codeExecution: {} }]
+      }
+    });
+
+    return response.text || "Analysis completed, but no text explanation was returned.";
+  } catch (error) {
+    console.error("Reconciliation Error:", error);
+    throw error;
+  }
+};

@@ -12,8 +12,10 @@
     <script>
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
-    <!-- SheetJS for Excel Export -->
+    <!-- SheetJS for Excel Export and Import -->
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Marked for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
       body {
         background-color: #f8fafc;
@@ -34,6 +36,18 @@
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: #94a3b8;
       }
+      /* Markdown Styles */
+      .prose h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; }
+      .prose h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.75rem; margin-top: 1.5rem; }
+      .prose p { margin-bottom: 0.75rem; line-height: 1.6; }
+      .prose ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+      .prose ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+      .prose table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+      .prose th, .prose td { border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }
+      .prose th { background-color: #f8fafc; font-weight: 600; }
+      .prose pre { background-color: #1e293b; color: #e2e8f0; padding: 1rem; rounded: 0.5rem; overflow-x: auto; margin-bottom: 1rem; border-radius: 0.5rem; }
+      .prose code { font-family: monospace; background-color: #f1f5f9; padding: 0.1rem 0.3rem; border-radius: 0.25rem; }
+      .prose pre code { background-color: transparent; padding: 0; color: inherit; }
     </style>
   <script type="importmap">
 {

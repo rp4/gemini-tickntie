@@ -6,6 +6,7 @@ declare global {
     pdfjsLib: any;
     XLSX: any;
     JSZip: any;
+    marked: any;
   }
 }
 
@@ -63,6 +64,26 @@ export const renderPdfToImage = async (file: File): Promise<string> => {
   }
 
   throw new Error('Unsupported file type for preview');
+};
+
+export const parseExcelFile = async (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = window.XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = window.XLSX.utils.sheet_to_json(worksheet);
+        resolve(json);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsArrayBuffer(file);
+  });
 };
 
 export const exportToZip = async (fields: FieldDefinition[], documents: DocumentResult[]) => {
