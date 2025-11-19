@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Upload, Plus, Trash2, FileText, Play, Download, Eye, CheckCircle, AlertCircle, Loader2, RefreshCw, FileSpreadsheet } from 'lucide-react';
-import { FieldDefinition, DocumentResult, COLORS } from './types';
+import { FieldDefinition, DocumentResult, ReconcileResult, COLORS } from './types';
 import { sanitizeKey, getNextColor, renderPdfToImage, exportToZip, parseExcelFile } from './utils';
 import { processDocument, reconcileData } from './geminiService';
 import DocumentViewer from './components/DocumentViewer';
@@ -26,7 +26,7 @@ const App: React.FC = () => {
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
   const [reconcilePrompt, setReconcilePrompt] = useState("Compare the 'Total Amount' extracted from documents with the 'Amount' column in the reference dataset. List any invoices that match and those that have discrepancies.");
   const [isReconciling, setIsReconciling] = useState(false);
-  const [reconcileResult, setReconcileResult] = useState<string | null>(null);
+  const [reconcileResult, setReconcileResult] = useState<ReconcileResult | null>(null);
 
   // --- Handlers ---
 
@@ -151,14 +151,14 @@ const App: React.FC = () => {
       setReconcileResult(result);
     } catch (error) {
       console.error(error);
-      setReconcileResult("An error occurred during analysis.");
+      setReconcileResult({ report: "An error occurred during analysis.", code: "" });
     } finally {
       setIsReconciling(false);
     }
   };
 
   const handleExport = () => {
-    exportToZip(fields, documents);
+    exportToZip(fields, documents, reconcileResult);
   };
 
   // --- Render ---
@@ -197,6 +197,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex gap-3">
+          {/* Actions for Tick Tab */}
           {activeTab === 'tick' && (
             <>
               <button 
@@ -219,6 +220,18 @@ const App: React.FC = () => {
                 Export ZIP
               </button>
             </>
+          )}
+          
+          {/* Actions for Tie Tab - Added Export Button */}
+          {activeTab === 'tie' && (
+             <button 
+                onClick={handleExport}
+                disabled={documents.length === 0 && !reconcileResult}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition disabled:opacity-50 text-sm"
+              >
+                <Download size={16} />
+                Export ZIP
+              </button>
           )}
         </div>
       </header>
@@ -450,7 +463,7 @@ const App: React.FC = () => {
                    ) : (
                      <div 
                        className="prose prose-slate max-w-none prose-headings:text-indigo-900 prose-a:text-indigo-600"
-                       dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(reconcileResult || '') : reconcileResult }}
+                       dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(reconcileResult?.report || '') : reconcileResult?.report }}
                      />
                    )}
                 </div>

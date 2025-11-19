@@ -24,6 +24,11 @@ export interface DocumentResult {
   data: Record<string, ExtractedValue>; // Keyed by FieldDefinition.key
 }
 
+export interface ReconcileResult {
+  report: string;
+  code: string;
+}
+
 export const COLORS = [
   '#ef4444', // red-500
   '#3b82f6', // blue-500

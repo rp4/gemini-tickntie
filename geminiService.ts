@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { DocumentResult, FieldDefinition, ExtractedValue } from './types';
+import { DocumentResult, FieldDefinition, ExtractedValue, ReconcileResult } from './types';
 import { fileToBase64 } from './utils';
 
 export const processDocument = async (
@@ -79,7 +79,7 @@ export const reconcileData = async (
   fields: FieldDefinition[],
   referenceData: any[],
   userInstructions: string
-): Promise<string> => {
+): Promise<ReconcileResult> => {
   if (!process.env.API_KEY) {
     throw new Error("API Key is missing");
   }
@@ -115,8 +115,11 @@ export const reconcileData = async (
     Write and execute Python code to perform the analysis requested by the user.
     Load the data into pandas DataFrames (create the dataframes directly from the provided JSON data).
     Perform the comparison/join/reconciliation.
-    Print the results in a clear, readable format (e.g., markdown table or summary text).
-    Explain any discrepancies found.
+    
+    IMPORTANT OUTPUT INSTRUCTION:
+    1. Print the results in a clear, readable format. 
+    2. If you are generating a table of data (e.g. matched invoices, discrepancies), ALWAYS print it as a Markdown Table.
+    3. Provide a summary text explanation of what was done and what was found.
   `;
 
   try {
@@ -128,7 +131,18 @@ export const reconcileData = async (
       }
     });
 
-    return response.text || "Analysis completed, but no text explanation was returned.";
+    const report = response.text || "Analysis completed, but no text explanation was returned.";
+    
+    // Extract executable code from candidates
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    const codeBlocks = parts
+      .filter((part: any) => part.executableCode)
+      .map((part: any) => part.executableCode.code);
+    
+    const code = codeBlocks.join('\n\n# ---------------------------------------------------------\n# Next Code Block\n# ---------------------------------------------------------\n\n');
+
+    return { report, code };
+
   } catch (error) {
     console.error("Reconciliation Error:", error);
     throw error;

@@ -1,4 +1,4 @@
-import { COLORS, DocumentResult, FieldDefinition } from './types';
+import { COLORS, DocumentResult, FieldDefinition, ReconcileResult } from './types';
 
 // Access globals loaded via CDN
 declare global {
@@ -86,7 +86,39 @@ export const parseExcelFile = async (file: File): Promise<any[]> => {
   });
 };
 
-export const exportToZip = async (fields: FieldDefinition[], documents: DocumentResult[]) => {
+// Helper to parse Markdown tables into array of arrays
+const parseMarkdownTable = (markdown: string): any[][] | null => {
+  const lines = markdown.split('\n');
+  const data: any[][] = [];
+  let tableStarted = false;
+
+  for (let line of lines) {
+    line = line.trim();
+    if (line.startsWith('|') && line.endsWith('|')) {
+      // Check if it's a separator line (e.g. |---|---|)
+      if (line.replace(/\|/g, '').trim().match(/^-+$/)) {
+        continue; 
+      }
+      
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      data.push(cells);
+      tableStarted = true;
+    } else if (tableStarted && line === '') {
+      // Stop if we hit an empty line after finding a table
+      // For simplicity, we only parse the *first* table found, or we could aggregate them.
+      // Let's just return the first one for now as the main result.
+      break;
+    }
+  }
+  
+  return data.length > 0 ? data : null;
+}
+
+export const exportToZip = async (
+  fields: FieldDefinition[], 
+  documents: DocumentResult[],
+  reconcileResult?: ReconcileResult | null
+) => {
   if (!window.XLSX || !window.JSZip) {
     console.error("Required libraries (SheetJS or JSZip) not loaded");
     alert("Export libraries are still loading. Please try again in a moment.");
@@ -123,6 +155,9 @@ export const exportToZip = async (fields: FieldDefinition[], documents: Document
     }
   });
 
+  const workbook = window.XLSX.utils.book_new();
+
+  // --- Sheet 1: Audit Data (Tick) ---
   // Prepare data headers
   const headers = [
     "File Name", 
@@ -150,9 +185,7 @@ export const exportToZip = async (fields: FieldDefinition[], documents: Document
   const worksheet = window.XLSX.utils.json_to_sheet(dataRows, { header: headers });
 
   // Add Hyperlinks to "File Name" column (Column A / Index 0)
-  // Iterate through rows to add the link
   const range = window.XLSX.utils.decode_range(worksheet['!ref']);
-  
   for (let R = range.s.r + 1; R <= range.e.r; ++R) {
     const docIndex = R - 1; // Adjust for header row
     if (docIndex < documents.length) {
@@ -169,9 +202,38 @@ export const exportToZip = async (fields: FieldDefinition[], documents: Document
       }
     }
   }
+  window.XLSX.utils.book_append_sheet(workbook, worksheet, "Source Data (Tick)");
 
-  const workbook = window.XLSX.utils.book_new();
-  window.XLSX.utils.book_append_sheet(workbook, worksheet, "Audit Data");
+  // --- Sheet 2, 3, 4: Reconcile Data (Tie) ---
+  if (reconcileResult) {
+    // 1. Reconciled Data (Parsed from Markdown Table)
+    const parsedTable = parseMarkdownTable(reconcileResult.report);
+    if (parsedTable) {
+      const sheet = window.XLSX.utils.aoa_to_sheet(parsedTable);
+      window.XLSX.utils.book_append_sheet(workbook, sheet, "Joined Data Details");
+    }
+
+    // 2. Analysis Report (Text)
+    // We wrap it in a cell
+    const reportSheet = window.XLSX.utils.aoa_to_sheet([
+      ["Analysis Report"],
+      [reconcileResult.report]
+    ]);
+    // Wrap text for readability
+    if (!reportSheet['!cols']) reportSheet['!cols'] = [];
+    reportSheet['!cols'][0] = { wch: 100 }; 
+    window.XLSX.utils.book_append_sheet(workbook, reportSheet, "Analysis Report");
+
+    // 3. Python Code
+    const codeSheet = window.XLSX.utils.aoa_to_sheet([
+      ["Executed Python Code"],
+      [reconcileResult.code]
+    ]);
+    if (!codeSheet['!cols']) codeSheet['!cols'] = [];
+    codeSheet['!cols'][0] = { wch: 100 };
+    window.XLSX.utils.book_append_sheet(workbook, codeSheet, "Python Code");
+  }
+
   
   // Write Excel to buffer
   const excelBuffer = window.XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
